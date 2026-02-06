@@ -75,3 +75,67 @@ def test_write_script_with_count(tmp_path, count, expected_command):
 
     # Verify the expected command is in the script
     assert expected_command in content
+
+
+
+def test_write_script_pixi(tmp_path, expected_slurm_script_pixi):
+    """Test write_script with pixi environment."""
+    expected_script, pixi_toml = expected_slurm_script_pixi
+
+    manager = SweepManager()
+    manager.sweep_id = "test-sweep-id"
+    manager.project_name = "test_project"
+    manager.entity = "test_entity"
+
+    job_file = tmp_path / "submit.sh"
+
+    manager.write_script(
+        slurm_parameters={"time": "01:00:00", "partition": "test"},
+        pixi_env=pixi_toml,
+        job_file=str(job_file),
+        modules="test_module",
+    )
+
+    assert job_file.exists()
+    with open(job_file) as f:
+        content = f.read()
+
+    assert content == expected_script
+
+
+def test_write_script_pixi_file_not_found(tmp_path):
+    """Test write_script raises FileNotFoundError for non-existent pixi manifest."""
+    manager = SweepManager()
+    manager.sweep_id = "test-sweep-id"
+    manager.project_name = "test_project"
+    manager.entity = "test_entity"
+
+    job_file = tmp_path / "submit.sh"
+
+    with pytest.raises(FileNotFoundError, match="Pixi manifest file not found"):
+        manager.write_script(
+            slurm_parameters={"time": "01:00:00", "partition": "test"},
+            pixi_env="/nonexistent/path/pixi.toml",
+            job_file=str(job_file),
+        )
+
+
+def test_write_script_mamba_and_pixi_exclusive(tmp_path):
+    """Test write_script raises ValueError when both mamba_env and pixi_env are specified."""
+    pixi_toml = tmp_path / "pixi.toml"
+    pixi_toml.write_text("[project]\nname = 'test'\n")
+
+    manager = SweepManager()
+    manager.sweep_id = "test-sweep-id"
+    manager.project_name = "test_project"
+    manager.entity = "test_entity"
+
+    job_file = tmp_path / "submit.sh"
+
+    with pytest.raises(ValueError, match="Cannot specify both `mamba_env` and `pixi_env`"):
+        manager.write_script(
+            slurm_parameters={"time": "01:00:00", "partition": "test"},
+            mamba_env="test_env",
+            pixi_env=str(pixi_toml),
+            job_file=str(job_file),
+        )

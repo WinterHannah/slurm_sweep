@@ -25,7 +25,11 @@ Create an account on [W&B][] and take a look at our examples in the [examples][]
 
 ### The config file
 You need config file in `yaml` format. This file should have three sections:
-- `general`: you need to define at least the `project_name` and the `entity` for the sweep on wandB.
+- `general`: you need to define at least the `project_name` and the `entity` for the sweep on wandB. You can also specify an environment to use:
+  - `mamba_env`: name of a mamba/conda environment to activate before running the agent.
+  - `pixi_env`: path to a `pixi.toml` manifest file. The wandb agent command will be wrapped with `pixi run --manifest-path`.
+  
+  **Note**: `mamba_env` and `pixi_env` are mutually exclusive.
 - `slurm`: any valid slurm option. Depends on your cluster, see the `simple_slurm` docs.
 - `wandb`: [standard W&B config](https://docs.wandb.ai/guides/sweeps/define-sweep-configuration/) for a hyperparameter sweep.
 

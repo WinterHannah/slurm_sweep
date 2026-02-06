@@ -81,6 +81,21 @@ mamba activate test_env
 wandb agent "test_entity/test_project/test-sweep-id"
 """
 
+@pytest.fixture
+def expected_slurm_script_pixi(tmp_path):
+    """Return expected script and the pixi.toml path for pixi environment tests."""
+    pixi_toml = tmp_path / "pixi.toml"
+    pixi_toml.write_text("[project]\nname = 'test'\n")
+    script = f"""#!/bin/bash
+
+#SBATCH --partition           test
+#SBATCH --time                01:00:00
+
+module load test_module
+pixi run --manifest-path {pixi_toml} wandb agent "test_entity/test_project/test-sweep-id"
+"""
+    return script, str(pixi_toml)
+
 
 @pytest.fixture
 def valid_cli_config_file(tmp_path):

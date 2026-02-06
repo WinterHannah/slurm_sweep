@@ -1,3 +1,4 @@
+from pathlib import Path
 import wandb
 from simple_slurm import Slurm
 
@@ -50,6 +51,7 @@ class SweepManager:
         self,
         slurm_parameters: dict | None = None,
         mamba_env: str | None = None,
+        pixi_env: str | None = None,
         job_file: str = "submit.sh",
         convert: bool = False,
         shell: str = "/bin/bash",
@@ -64,7 +66,11 @@ class SweepManager:
         slurm_parameters
             A dictionary of SLURM parameters to pass to the `Slurm` class.
         mamba_env
-            Mamba environment to activate.
+            Mamba environment to activate. Mutually exclusive with ``pixi_env``.
+        pixi_env
+            Path to a pixi manifest file (pixi.toml) to use for running the wandb agent.
+            The command will be wrapped with ``pixi run --manifest-path <pixi_env>``.
+            Mutually exclusive with ``mamba_env``.
         job_file
             The slurm submission script will be written here.
         convert
@@ -80,6 +86,15 @@ class SweepManager:
         if not self.sweep_id:
             raise ValueError("Sweep ID is not set. Please register the sweep first.")
 
+        # Validate mutual exclusivity of mamba_env and pixi_env
+        if mamba_env and pixi_env:
+            raise ValueError("Cannot specify both `mamba_env` and `pixi_env`. Please choose one.")
+
+        # Validate pixi_env path exists
+        if pixi_env and not Path(pixi_env).exists():
+            raise FileNotFoundError(f"Pixi manifest file not found: '{pixi_env}'")
+
+
         # Initialize SLURM with user-provided parameters
         slurm_parameters = slurm_parameters or {}
         slurm = Slurm(**slurm_parameters)
@@ -93,11 +108,18 @@ class SweepManager:
             slurm.add_cmd("source $HOME/.bashrc")
             slurm.add_cmd(f"mamba activate {mamba_env}")
 
-        # Add the wandb agent command with optional --count flag for SLURM compatibility
+        # Build the wandb agent command with optional --count flag for SLURM compatibility
         count_flag = f"--count {count}" if count is not None else ""
-        command = (
+        wandb_command = (
             f'wandb agent{f" {count_flag}" if count_flag else ""} "{self.entity}/{self.project_name}/{self.sweep_id}"'
         )
+       
+        # Wrap with pixi if pixi_env is specified
+        if pixi_env:
+            command = f"pixi run --manifest-path {pixi_env} {wandb_command}"
+        else:
+            command = wandb_command
+        
         slurm.add_cmd(command)
 
         # Write to file
