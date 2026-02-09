@@ -28,7 +28,7 @@ dependencies = [
   "session-info2",
   "simple-slurm",
   "typer",
-  "wandb",
+  "wandb"
 ]
 optional-dependencies.dev = [
   "pre-commit",
@@ -57,6 +57,7 @@ optional-dependencies.test = [
   "coverage>=7.10",
   "pytest",
   "pytest-cov",     # For VS Code’s coverage functionality
+  "PyYAML",
 ]
 
 # https://docs.pypi.org/project_metadata/#project-urls

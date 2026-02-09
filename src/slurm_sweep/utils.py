@@ -75,9 +75,13 @@ class ConfigValidator:
         if "entity" not in general_config or "project_name" not in general_config:
             raise ValueError("The `general` block must include `entity` and `project_name` keys.")
 
-        # Validate mutual exclusivity of mamba_env and pixi_env
-        if "mamba_env" in general_config and "pixi_env" in general_config:
-            raise ValueError("Cannot specify both `mamba_env` and `pixi_env` in the `general` block. Please choose one.")
+        # Validate mutual exclusivity of mamba_env, pixi_env, and uv_env
+        env_keys = ["mamba_env", "pixi_env", "uv_env"]
+        specified_envs = [k for k in env_keys if k in general_config]
+        if len(specified_envs) > 1:
+            raise ValueError(
+                f"Cannot specify multiple environment types: {specified_envs}. Please choose one."
+            )
 
         # Validate pixi_env path exists
         if "pixi_env" in general_config:
@@ -86,6 +90,14 @@ class ConfigValidator:
             pixi_path = general_config["pixi_env"]
             if not Path(pixi_path).exists():
                 raise FileNotFoundError(f"Pixi manifest file not found: '{pixi_path}'")
+
+        # Validate uv_env path exists
+        if "uv_env" in general_config:
+            from pathlib import Path
+
+            uv_path = general_config["uv_env"]
+            if not Path(uv_path).exists():
+                raise FileNotFoundError(f"uv environment path not found: '{uv_path}'")
 
         # Ensure the `slurm` block exists
         self.config.setdefault("slurm", {})

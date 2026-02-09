@@ -132,10 +132,100 @@ def test_write_script_mamba_and_pixi_exclusive(tmp_path):
 
     job_file = tmp_path / "submit.sh"
 
-    with pytest.raises(ValueError, match="Cannot specify both `mamba_env` and `pixi_env`"):
+    with pytest.raises(ValueError, match="Cannot specify more than one environment type"):
         manager.write_script(
             slurm_parameters={"time": "01:00:00", "partition": "test"},
             mamba_env="test_env",
             pixi_env=str(pixi_toml),
+            job_file=str(job_file),
+        )
+
+
+def test_write_script_uv_toml(tmp_path, expected_slurm_script_uv_toml):
+    """Test write_script with uv environment (pyproject.toml)."""
+    expected_script, pyproject_toml = expected_slurm_script_uv_toml
+
+    manager = SweepManager()
+    manager.sweep_id = "test-sweep-id"
+    manager.project_name = "test_project"
+    manager.entity = "test_entity"
+
+    job_file = tmp_path / "submit.sh"
+
+    manager.write_script(
+        slurm_parameters={"time": "01:00:00", "partition": "test"},
+        uv_env=pyproject_toml,
+        job_file=str(job_file),
+        modules="test_module",
+    )
+
+    assert job_file.exists()
+    with open(job_file) as f:
+        content = f.read()
+
+    assert content == expected_script
+
+
+def test_write_script_uv_venv(tmp_path, expected_slurm_script_uv_venv):
+    """Test write_script with uv environment (venv directory)."""
+    expected_script, venv_dir = expected_slurm_script_uv_venv
+
+    manager = SweepManager()
+    manager.sweep_id = "test-sweep-id"
+    manager.project_name = "test_project"
+    manager.entity = "test_entity"
+
+    job_file = tmp_path / "submit.sh"
+
+    manager.write_script(
+        slurm_parameters={"time": "01:00:00", "partition": "test"},
+        uv_env=venv_dir,
+        job_file=str(job_file),
+        modules="test_module",
+    )
+
+    assert job_file.exists()
+    with open(job_file) as f:
+        content = f.read()
+
+    assert content == expected_script
+
+
+def test_write_script_uv_file_not_found(tmp_path):
+    """Test write_script raises FileNotFoundError for non-existent uv_env path."""
+    manager = SweepManager()
+    manager.sweep_id = "test-sweep-id"
+    manager.project_name = "test_project"
+    manager.entity = "test_entity"
+
+    job_file = tmp_path / "submit.sh"
+
+    with pytest.raises(FileNotFoundError, match="uv environment path not found"):
+        manager.write_script(
+            slurm_parameters={"time": "01:00:00", "partition": "test"},
+            uv_env="/nonexistent/path/pyproject.toml",
+            job_file=str(job_file),
+        )
+
+
+def test_write_script_multiple_envs_exclusive(tmp_path):
+    """Test write_script raises ValueError when multiple environment types are specified."""
+    pixi_toml = tmp_path / "pixi.toml"
+    pixi_toml.write_text("[project]\nname = 'test'\n")
+    venv_dir = tmp_path / ".venv"
+    venv_dir.mkdir()
+
+    manager = SweepManager()
+    manager.sweep_id = "test-sweep-id"
+    manager.project_name = "test_project"
+    manager.entity = "test_entity"
+
+    job_file = tmp_path / "submit.sh"
+
+    with pytest.raises(ValueError, match="Cannot specify more than one environment type"):
+        manager.write_script(
+            slurm_parameters={"time": "01:00:00", "partition": "test"},
+            pixi_env=str(pixi_toml),
+            uv_env=str(venv_dir),
             job_file=str(job_file),
         )

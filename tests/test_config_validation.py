@@ -64,7 +64,7 @@ def test_mamba_and_pixi_exclusive(tmp_path):
 
     validator = ConfigValidator(config_path=str(file_path))
     validator.load_config()
-    with pytest.raises(ValueError, match="Cannot specify both `mamba_env` and `pixi_env`"):
+    with pytest.raises(ValueError, match="Cannot specify multiple environment types"):
         validator.validate()
 
 
@@ -120,3 +120,119 @@ def test_valid_pixi_env(tmp_path):
     validator = ConfigValidator(config_path=str(file_path))
     validator.load_config()
     validator.validate()  # Should not raise
+
+
+def test_uv_env_file_not_found(tmp_path):
+    """Test that non-existent uv_env path raises FileNotFoundError."""
+    config = {
+        "wandb": {
+            "program": "train.py",
+            "method": "grid",
+            "parameters": {"lr": {"values": [0.01, 0.1]}},
+        },
+        "general": {
+            "entity": "test_entity",
+            "project_name": "test_project",
+            "uv_env": "/nonexistent/path/pyproject.toml",
+        },
+    }
+    import yaml
+
+    file_path = tmp_path / "invalid_uv_config.yaml"
+    with open(file_path, "w") as f:
+        yaml.dump(config, f)
+
+    validator = ConfigValidator(config_path=str(file_path))
+    validator.load_config()
+    with pytest.raises(FileNotFoundError, match="uv environment path not found"):
+        validator.validate()
+
+
+def test_valid_uv_env_toml(tmp_path):
+    """Test that valid uv_env with pyproject.toml path passes validation."""
+    project_dir = tmp_path / "myproject"
+    project_dir.mkdir()
+    pyproject_toml = project_dir / "pyproject.toml"
+    pyproject_toml.write_text("[project]\nname = 'test'\n")
+
+    config = {
+        "wandb": {
+            "program": "train.py",
+            "method": "grid",
+            "parameters": {"lr": {"values": [0.01, 0.1]}},
+        },
+        "general": {
+            "entity": "test_entity",
+            "project_name": "test_project",
+            "uv_env": str(pyproject_toml),
+        },
+    }
+    import yaml
+
+    file_path = tmp_path / "valid_uv_toml_config.yaml"
+    with open(file_path, "w") as f:
+        yaml.dump(config, f)
+
+    validator = ConfigValidator(config_path=str(file_path))
+    validator.load_config()
+    validator.validate()  # Should not raise
+
+
+def test_valid_uv_env_venv(tmp_path):
+    """Test that valid uv_env with venv directory path passes validation."""
+    venv_dir = tmp_path / ".venv"
+    venv_dir.mkdir()
+
+    config = {
+        "wandb": {
+            "program": "train.py",
+            "method": "grid",
+            "parameters": {"lr": {"values": [0.01, 0.1]}},
+        },
+        "general": {
+            "entity": "test_entity",
+            "project_name": "test_project",
+            "uv_env": str(venv_dir),
+        },
+    }
+    import yaml
+
+    file_path = tmp_path / "valid_uv_venv_config.yaml"
+    with open(file_path, "w") as f:
+        yaml.dump(config, f)
+
+    validator = ConfigValidator(config_path=str(file_path))
+    validator.load_config()
+    validator.validate()  # Should not raise
+
+
+def test_multiple_envs_exclusive(tmp_path):
+    """Test that specifying multiple environment types raises ValueError."""
+    pixi_toml = tmp_path / "pixi.toml"
+    pixi_toml.write_text("[project]\nname = 'test'\n")
+    venv_dir = tmp_path / ".venv"
+    venv_dir.mkdir()
+
+    config = {
+        "wandb": {
+            "program": "train.py",
+            "method": "grid",
+            "parameters": {"lr": {"values": [0.01, 0.1]}},
+        },
+        "general": {
+            "entity": "test_entity",
+            "project_name": "test_project",
+            "pixi_env": str(pixi_toml),
+            "uv_env": str(venv_dir),
+        },
+    }
+    import yaml
+
+    file_path = tmp_path / "multiple_envs_config.yaml"
+    with open(file_path, "w") as f:
+        yaml.dump(config, f)
+
+    validator = ConfigValidator(config_path=str(file_path))
+    validator.load_config()
+    with pytest.raises(ValueError, match="Cannot specify multiple environment types"):
+        validator.validate()

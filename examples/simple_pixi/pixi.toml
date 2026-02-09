@@ -1,0 +1,10 @@
+[project]
+name = "slurm_sweep_e2e_pixi"
+version = "0.1.0"
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[dependencies]
+python = ">=3.11"
+wandb = ">=0.15"
+numpy = ">=1.24"

@@ -52,6 +52,7 @@ class SweepManager:
         slurm_parameters: dict | None = None,
         mamba_env: str | None = None,
         pixi_env: str | None = None,
+        uv_env: str | None = None,
         job_file: str = "submit.sh",
         convert: bool = False,
         shell: str = "/bin/bash",
@@ -66,11 +67,17 @@ class SweepManager:
         slurm_parameters
             A dictionary of SLURM parameters to pass to the `Slurm` class.
         mamba_env
-            Mamba environment to activate. Mutually exclusive with ``pixi_env``.
+            Mamba environment to activate. Mutually exclusive with ``pixi_env`` and ``uv_env``.
         pixi_env
             Path to a pixi manifest file (pixi.toml) to use for running the wandb agent.
             The command will be wrapped with ``pixi run --manifest-path <pixi_env>``.
-            Mutually exclusive with ``mamba_env``.
+            Mutually exclusive with ``mamba_env`` and ``uv_env``.
+        uv_env
+            Path to a uv environment. Can be either:
+            - A path to a `pyproject.toml` file: command will be wrapped with
+              ``uv run --project <parent_dir>``.
+            - A path to a virtual environment directory: will source the activate script.
+            Mutually exclusive with ``mamba_env`` and ``pixi_env``.
         job_file
             The slurm submission script will be written here.
         convert
@@ -86,13 +93,21 @@ class SweepManager:
         if not self.sweep_id:
             raise ValueError("Sweep ID is not set. Please register the sweep first.")
 
-        # Validate mutual exclusivity of mamba_env and pixi_env
-        if mamba_env and pixi_env:
-            raise ValueError("Cannot specify both `mamba_env` and `pixi_env`. Please choose one.")
+        # Validate mutual exclusivity of environment options
+        env_count = sum(x is not None for x in [mamba_env, pixi_env, uv_env])
+        if env_count > 1:
+            raise ValueError(
+                "Cannot specify more than one environment type. "
+                "Please choose one of: `mamba_env`, `pixi_env`, or `uv_env`."
+            )
 
         # Validate pixi_env path exists
         if pixi_env and not Path(pixi_env).exists():
             raise FileNotFoundError(f"Pixi manifest file not found: '{pixi_env}'")
+
+        # Validate uv_env path exists
+        if uv_env and not Path(uv_env).exists():
+            raise FileNotFoundError(f"uv environment path not found: '{uv_env}'")
 
 
         # Initialize SLURM with user-provided parameters
@@ -114,9 +129,19 @@ class SweepManager:
             f'wandb agent{f" {count_flag}" if count_flag else ""} "{self.entity}/{self.project_name}/{self.sweep_id}"'
         )
        
-        # Wrap with pixi if pixi_env is specified
+        # Wrap command based on environment type
         if pixi_env:
             command = f"pixi run --manifest-path {pixi_env} {wandb_command}"
+        elif uv_env:
+            uv_path = Path(uv_env)
+            if uv_path.suffix == ".toml":
+                # It's a pyproject.toml file, use the parent directory as the project
+                project_dir = uv_path.parent
+                command = f"uv run --project {project_dir} {wandb_command}"
+            else:
+                # It's a virtual environment directory, source the activate script
+                slurm.add_cmd(f"source {uv_path}/bin/activate")
+                command = wandb_command
         else:
             command = wandb_command
         
